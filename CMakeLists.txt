@@ -28,6 +28,7 @@ add_library(flyquant_core
   src/connectome.cpp
   src/controls.cpp
   src/neural.cpp
+  src/model.cpp
   src/sha256.cpp
   src/experiment.cpp)
 

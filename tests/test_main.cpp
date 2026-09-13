@@ -4,10 +4,12 @@
 #include "flyquant/features.hpp"
 #include "flyquant/logistic_regression.hpp"
 #include "flyquant/neural.hpp"
+#include "flyquant/model.hpp"
 #include "flyquant/sha256.hpp"
 #include "flyquant/split.hpp"
 
 #include <cmath>
+#include <filesystem>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -33,19 +35,25 @@ void test_leakage_audit() {
   s.target_event_ts_ns = 200;
   s.x.assign(flyquant::kFeatureCount, 0.0);
   bool threw = false;
-  try { flyquant::audit_no_feature_leakage({s}); } catch (...) { threw = true; }
+  try {
+    flyquant::audit_no_feature_leakage({s});
+  } catch (...) {
+    threw = true;
+  }
   expect(threw, "future feature event must be rejected");
 }
 
 void test_feature_builder_ignores_future_quotes() {
   flyquant::MarketData a;
   flyquant::MarketData b;
+  std::uint64_t seq = 1;
   for (int sec = 0; sec <= 700; ++sec) {
     const auto ts = static_cast<flyquant::TimestampNs>(sec) * flyquant::kNsPerSecond;
     const double mid = 100.0 + 0.001 * static_cast<double>(sec);
     flyquant::QuoteSnapshot q{ts, mid - 0.5, 10.0, mid + 0.5, 10.0};
     a.quotes.push_back(q);
     b.quotes.push_back(q);
+    ++seq;
   }
   const auto anchor = 360LL * flyquant::kNsPerSecond;
   for (auto& q : b.quotes) {
@@ -116,14 +124,44 @@ void test_degree_shuffle() {
 
 void test_neural_decoder() {
   const auto g = tiny_graph();
-  const auto encoder = flyquant::SensoryEncoder::from_assignments({{0,0,1.0,0.0}}, 1);
+  const auto encoder = flyquant::SensoryEncoder::from_assignments({{0,0,1.0,0.0,1}}, 1);
   const auto drive = encoder.encode({1.0}, g.neurons().size());
   const flyquant::NeuralDynamics dynamics({4,0.5,1.0,1.0});
   const auto state = dynamics.run(g, drive);
   const auto decoder = flyquant::UpDownDecoder::from_assignments(
-      {{3,flyquant::OutputChannel::Up},{1,flyquant::OutputChannel::Down}});
+      {{3,flyquant::OutputChannel::Up,4},{1,flyquant::OutputChannel::Down,2}});
   const auto result = decoder.decode(state);
   expect(result.p_up >= 0.0 && result.p_up <= 1.0, "decoder probability bounds");
+}
+
+void test_model_roundtrip() {
+  const auto g = tiny_graph();
+  const auto encoder = flyquant::SensoryEncoder::from_assignments({{0,0,1.0,0.0,1}}, 1);
+  const auto decoder = flyquant::UpDownDecoder::from_assignments(
+      {{3,flyquant::OutputChannel::Up,4},{1,flyquant::OutputChannel::Down,2}});
+  std::vector<flyquant::FeatureSample> train;
+  for (int i = -8; i <= 8; ++i) {
+    if (i == 0) continue;
+    flyquant::FeatureSample s;
+    s.anchor_ts_ns = i;
+    s.x = {static_cast<double>(i)};
+    s.y = i > 0 ? 1 : 0;
+    train.push_back(s);
+  }
+  const flyquant::ModelSourceHashes hashes{"neurons-hash", "edges-hash", "sensory-hash", "outputs-hash"};
+  const auto model = flyquant::ConnectomeReservoirModel::train(
+      g, encoder, decoder, {4,0.5,1.0,1.0}, train, {50,0.05,0.0}, hashes);
+  const auto before = model.predict(g, train);
+  const auto path = std::filesystem::temp_directory_path() / "flyquant_model_roundtrip.fqmodel";
+  model.save(path);
+  const auto loaded = flyquant::ConnectomeReservoirModel::load(path, g, "neurons-hash", "edges-hash");
+  const auto after = loaded.predict(g, train);
+  std::filesystem::remove(path);
+  expect(before.size() == after.size(), "model roundtrip prediction count");
+  for (std::size_t i = 0; i < before.size(); ++i) {
+    expect(std::abs(before[i].p_up - after[i].p_up) < 1e-12,
+           "model roundtrip probability equality");
+  }
 }
 
 }  // namespace
@@ -137,6 +175,7 @@ int main() {
     test_logistic();
     test_degree_shuffle();
     test_neural_decoder();
+    test_model_roundtrip();
     std::cout << "all tests passed\n";
     return 0;
   } catch (const std::exception& e) {

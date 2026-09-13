@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 namespace flyquant {
@@ -27,13 +28,16 @@ struct RunProvenance {
 class ImmutableRunWriter {
  public:
   ImmutableRunWriter(const std::filesystem::path& root, RunProvenance provenance);
+
   void write_manifest(const ExperimentConfig& cfg, const std::string& model_name,
-                      const std::string& evaluation_split, std::uint64_t runtime_ms);
+                      const std::string& evaluation_split, std::uint64_t runtime_ms,
+                      const std::vector<std::pair<std::string, std::string>>& extras = {});
   void write_predictions(const std::string& model_name, const std::string& split,
                          const std::vector<Prediction>& predictions);
   void write_metrics(const std::vector<std::tuple<std::string, std::string, ClassificationMetrics>>& rows);
   void write_errors(const std::string& text);
   [[nodiscard]] const std::filesystem::path& directory() const noexcept { return directory_; }
+
  private:
   RunProvenance provenance_;
   std::filesystem::path directory_;

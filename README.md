@@ -69,3 +69,35 @@ The repository does not vendor the connectome or BTC datasets.
 ## Research rule
 
 If logistic regression wins, report it. If a shuffled graph wins, report it. If the real connectome does not survive controls, report that. TEST data that influences design is no longer TEST data.
+
+## Connectome reservoir model + Google Colab
+
+The first neural model is intentionally small: the authentic connectome is a fixed recurrent reservoir, market features enter through a frozen sensory map, and only the constrained UP/DOWN readout is trained. This makes the topology itself testable before introducing a large trainable parameter budget.
+
+Train/export in C++:
+
+```bash
+./build/flyquant train-connectome \
+  --config config/phase1.conf \
+  --neurons data/connectome/neurons.csv \
+  --edges data/connectome/edges.csv \
+  --sensory data/connectome/sensory.csv \
+  --outputs data/connectome/outputs.csv \
+  --model-out models/exports/connectome_reservoir_v1.fqmodel \
+  --split validation
+```
+
+Reload the exact artifact through the infrastructure:
+
+```bash
+./build/flyquant predict-connectome \
+  --config config/phase1.conf \
+  --neurons data/connectome/neurons.csv \
+  --edges data/connectome/edges.csv \
+  --model-in models/exports/connectome_reservoir_v1.fqmodel \
+  --split validation
+```
+
+The model artifact embeds TRAIN-only normalization, dynamics settings, sensory/output assignments, readout parameters, and source hashes. Prediction CSVs include raw `activity_up` and `activity_down` as well as `p_up`.
+
+For hosted training, open `notebooks/FlyQuant_Colab_Train.ipynb` in Google Colab. Colab is only the compute host; all research/model functionality remains C++20.

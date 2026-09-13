@@ -33,8 +33,10 @@ ImmutableRunWriter::ImmutableRunWriter(const std::filesystem::path& root, RunPro
   }
 }
 
-void ImmutableRunWriter::write_manifest(const ExperimentConfig& c, const std::string& model_name,
-                                        const std::string& evaluation_split, std::uint64_t runtime_ms) {
+void ImmutableRunWriter::write_manifest(
+    const ExperimentConfig& c, const std::string& model_name,
+    const std::string& evaluation_split, std::uint64_t runtime_ms,
+    const std::vector<std::pair<std::string, std::string>>& extras) {
   std::ofstream out(directory_ / "manifest.txt", std::ios::out | std::ios::trunc);
   if (!out) throw std::runtime_error("cannot write manifest");
   out << "experiment_id=" << provenance_.experiment_id << '\n'
@@ -57,8 +59,15 @@ void ImmutableRunWriter::write_manifest(const ExperimentConfig& c, const std::st
       << "max_quote_age_ns=" << c.max_quote_age_ns << '\n'
       << "logistic_epochs=" << c.logistic_epochs << '\n'
       << "logistic_learning_rate=" << c.logistic_learning_rate << '\n'
-      << "logistic_l2=" << c.logistic_l2 << '\n'
-      << "runtime_ms=" << runtime_ms << '\n';
+      << "logistic_l2=" << c.logistic_l2 << '\n';
+  for (const auto& [key, value] : extras) {
+    if (key.empty() || key.find('=') != std::string::npos || key.find('\n') != std::string::npos ||
+        value.find('\n') != std::string::npos) {
+      throw std::runtime_error("invalid manifest extra field");
+    }
+    out << key << '=' << value << '\n';
+  }
+  out << "runtime_ms=" << runtime_ms << '\n';
 }
 
 void ImmutableRunWriter::write_predictions(const std::string& model_name, const std::string& split,
@@ -66,9 +75,11 @@ void ImmutableRunWriter::write_predictions(const std::string& model_name, const 
   std::ofstream out(directory_ / ("predictions_" + model_name + "_" + split + ".csv"),
                     std::ios::out | std::ios::trunc);
   if (!out) throw std::runtime_error("cannot write predictions");
-  out << "anchor_ts_ns,y,future_log_return,p_up\n" << std::setprecision(17);
+  out << "anchor_ts_ns,y,future_log_return,p_up,activity_up,activity_down\n"
+      << std::setprecision(17);
   for (const auto& p : predictions) {
-    out << p.anchor_ts_ns << ',' << p.y << ',' << p.future_log_return << ',' << p.p_up << '\n';
+    out << p.anchor_ts_ns << ',' << p.y << ',' << p.future_log_return << ',' << p.p_up
+        << ',' << p.activity_up << ',' << p.activity_down << '\n';
   }
 }
 
