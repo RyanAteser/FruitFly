@@ -17,10 +17,12 @@ std::vector<Neuron> copy_neurons(const ConnectomeGraph& g) { return g.neurons();
 }  // namespace
 
 ConnectomeGraph degree_preserving_shuffle(const ConnectomeGraph& graph, std::uint64_t seed,
-                                          std::size_t attempted_swaps_per_edge) {
+                                          std::size_t attempted_swaps_per_edge,
+                                          WeightTransform transform) {
   auto edges = graph.edges();
-  if (edges.size() < 2) return ConnectomeGraph::from_parts(copy_neurons(graph), std::move(edges),
-      WeightTransform::UnsignedLog1pIncomingNormalized);
+  if (edges.size() < 2) {
+    return ConnectomeGraph::from_parts(copy_neurons(graph), std::move(edges), transform);
+  }
 
   std::unordered_set<std::uint64_t> occupied;
   for (const auto& e : edges) occupied.insert(pair_key(e.source, e.target));
@@ -53,14 +55,15 @@ ConnectomeGraph degree_preserving_shuffle(const ConnectomeGraph& graph, std::uin
     occupied.insert(new2);
   }
 
-  return ConnectomeGraph::from_parts(copy_neurons(graph), std::move(edges),
-                                     WeightTransform::UnsignedLog1pIncomingNormalized);
+  return ConnectomeGraph::from_parts(copy_neurons(graph), std::move(edges), transform);
 }
 
-ConnectomeGraph random_graph_control(const ConnectomeGraph& graph, std::uint64_t seed) {
+ConnectomeGraph random_graph_control(const ConnectomeGraph& graph, std::uint64_t seed,
+                                     WeightTransform transform) {
   const auto n = graph.neurons().size();
   const auto m = graph.edges().size();
-  if (n < 2 && m > 0) throw std::runtime_error("cannot generate non-self random graph");
+  if (m == 0) return ConnectomeGraph::from_parts(copy_neurons(graph), {}, transform);
+  if (n < 2) throw std::runtime_error("cannot generate non-self random graph");
   const std::uint64_t max_pairs = static_cast<std::uint64_t>(n) * static_cast<std::uint64_t>(n - 1);
   if (static_cast<std::uint64_t>(m) > max_pairs) throw std::runtime_error("too many edges for simple random graph");
 
@@ -82,8 +85,7 @@ ConnectomeGraph random_graph_control(const ConnectomeGraph& graph, std::uint64_t
     e.target = dst;
     edges.push_back(e);
   }
-  return ConnectomeGraph::from_parts(copy_neurons(graph), std::move(edges),
-                                     WeightTransform::UnsignedLog1pIncomingNormalized);
+  return ConnectomeGraph::from_parts(copy_neurons(graph), std::move(edges), transform);
 }
 
 }  // namespace flyquant
