@@ -1,0 +1,10 @@
+/build/
+/results/*
+!/results/.gitkeep
+/data/*.csv
+/data/*.feather
+/data/*.parquet
+/data/*.arrow
+/data/*.bin
+*.log
+.DS_Store
