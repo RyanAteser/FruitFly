@@ -36,7 +36,7 @@ SensoryEncoder SensoryEncoder::load_csv(const std::filesystem::path& path,
     const auto neuron_id = std::stoull(f[0]);
     const auto feature_index = static_cast<std::size_t>(std::stoull(f[1]));
     if (feature_index >= feature_count) throw std::runtime_error("sensory feature_index out of range");
-    a.push_back({graph.neuron_index(neuron_id), feature_index, std::stod(f[2]), std::stod(f[3])});
+    a.push_back({graph.neuron_index(neuron_id), feature_index, std::stod(f[2]), std::stod(f[3]), neuron_id});
   }
   return from_assignments(std::move(a), feature_count);
 }
@@ -111,7 +111,8 @@ UpDownDecoder UpDownDecoder::load_csv(const std::filesystem::path& path,
     if (f[1] == "UP") channel = OutputChannel::Up;
     else if (f[1] == "DOWN") channel = OutputChannel::Down;
     else throw std::runtime_error("output channel must be UP or DOWN");
-    a.push_back({graph.neuron_index(std::stoull(f[0])), channel});
+    const auto neuron_id = std::stoull(f[0]);
+    a.push_back({graph.neuron_index(neuron_id), channel, neuron_id});
   }
   return from_assignments(std::move(a));
 }

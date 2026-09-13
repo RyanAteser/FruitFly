@@ -14,6 +14,7 @@ struct SensoryAssignment {
   std::size_t feature_index{};
   double gain{1.0};
   double bias{};
+  NeuronId neuron_id{};
 };
 
 class SensoryEncoder {
@@ -25,6 +26,11 @@ class SensoryEncoder {
                                          std::size_t feature_count);
   [[nodiscard]] std::vector<double> encode(const std::vector<double>& features,
                                            std::size_t neuron_count) const;
+  [[nodiscard]] const std::vector<SensoryAssignment>& assignments() const noexcept {
+    return assignments_;
+  }
+  [[nodiscard]] std::size_t feature_count() const noexcept { return feature_count_; }
+
  private:
   std::vector<SensoryAssignment> assignments_;
   std::size_t feature_count_{};
@@ -42,6 +48,7 @@ class NeuralDynamics {
   explicit NeuralDynamics(DynamicsConfig config);
   [[nodiscard]] std::vector<double> run(const ConnectomeGraph& graph,
                                         const std::vector<double>& external_drive) const;
+
  private:
   DynamicsConfig config_;
 };
@@ -50,6 +57,7 @@ enum class OutputChannel { Up, Down };
 struct OutputAssignment {
   std::size_t neuron_index{};
   OutputChannel channel{OutputChannel::Up};
+  NeuronId neuron_id{};
 };
 
 class UpDownDecoder {
@@ -57,12 +65,18 @@ class UpDownDecoder {
   static UpDownDecoder load_csv(const std::filesystem::path& path,
                                 const ConnectomeGraph& graph);
   static UpDownDecoder from_assignments(std::vector<OutputAssignment> assignments);
+
   struct Result {
     double activity_up{};
     double activity_down{};
     double p_up{};
   };
+
   [[nodiscard]] Result decode(const std::vector<double>& state) const;
+  [[nodiscard]] const std::vector<OutputAssignment>& assignments() const noexcept {
+    return assignments_;
+  }
+
  private:
   std::vector<OutputAssignment> assignments_;
 };
