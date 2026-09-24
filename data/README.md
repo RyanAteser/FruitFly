@@ -20,6 +20,38 @@ Rules:
 - `receive_ts_ns` is preserved as supplied. It is not compared numerically with the exchange clock because the two clocks may not share a synchronized epoch.
 - Prices and quantities use exchange-native units converted to decimal values before ingestion. That conversion must be documented with the dataset.
 
+### Binance USD-M archive conversion
+
+`tools/binance_to_flyquant.py` downloads daily `bookTicker` and `aggTrades`
+archives and converts them without third-party Python packages. Raw archives and
+generated datasets remain untracked.
+
+The conversion contract is:
+
+- use `transaction_time` for `bookTicker` and `transact_time` for `aggTrades`;
+- multiply Binance millisecond timestamps by 1,000,000;
+- apply a half-open `[start, end)` UTC window;
+- order equal timestamps by QUOTE before TRADE, then native Binance ID, then source row;
+- assign a one-based global `sequence` after the merge;
+- leave `receive_ts_ns` empty because archive data has no local receive time;
+- map `is_buyer_maker=true` to sell aggressor `S`, otherwise buy aggressor `B`;
+- preserve the archive's decimal price and quantity strings.
+
+Example:
+
+```bash
+python3 tools/binance_to_flyquant.py \
+  --date 2024-01-15 \
+  --start 2024-01-15T00:00:00Z \
+  --end 2024-01-15T03:00:00Z \
+  --archive-dir data/raw/binance \
+  --output data/btc_events.csv
+```
+
+Pass the recorded archive and output hashes with `--book-sha256`,
+`--trades-sha256`, and `--expected-output-sha256` to make a provenance mismatch
+fail immediately.
+
 ## Normalized connectome
 
 The core runtime intentionally does not depend on Python/R or Apache Arrow. A C++ importer will normalize official MaleCNS data into two CSVs.

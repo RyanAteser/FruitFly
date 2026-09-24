@@ -51,4 +51,9 @@ if(BUILD_TESTING)
   add_executable(flyquant_tests tests/test_main.cpp)
   target_link_libraries(flyquant_tests PRIVATE flyquant_core)
   add_test(NAME flyquant_tests COMMAND flyquant_tests)
+
+  find_package(Python3 COMPONENTS Interpreter REQUIRED)
+  add_test(
+    NAME binance_to_flyquant_tests
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_binance_to_flyquant.py)
 endif()
